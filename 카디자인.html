@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>카디자인 - 고객 및 A/S 종합 관리 (실시간 공유)</title>
+
+    <!-- 모바일 PWA 및 어플 모드 설정 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="카디자인">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2563eb">
+
+    <!-- 홈 화면 앱 아이콘 -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%232563eb'><rect width='100' height='100' rx='22' fill='%232563eb'/><path fill='%23ffffff' d='M30,65 L30,60 L35,55 L65,55 L70,60 L70,65 Z M25,45 L35,30 L65,30 L75,45 Z'/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%232563eb'><rect width='100' height='100' rx='22' fill='%232563eb'/><path fill='%23ffffff' d='M30,65 L30,60 L35,55 L65,55 L70,60 L70,65 Z M25,45 L35,30 L65,30 L75,45 Z'/></svg>">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK (Compat Version for Easy Integration) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#2563eb',
+                            dark: '#1d4ed8',
+                            light: '#eff6ff'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            touch-action: manipulation;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background-color: #ffffff;
+            box-shadow: 0 4px 25px -5px rgba(0, 0, 0, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 768px) {
+            .app-container {
+                max-width: 100%;
+                min-height: 100vh;
+            }
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .btn-touch {
+            cursor: pointer;
+            transition: transform 0.12s ease, opacity 0.12s ease;
+        }
+        .btn-touch:active {
+            transform: scale(0.96);
+            opacity: 0.88;
+        }
+
+        input, textarea, select {
+            user-select: text !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex justify-center items-center min-h-screen p-0 md:p-4">
+
+    <!-- App Shell Wrapper -->
+    <div class="app-container w-full bg-white flex flex-col relative overflow-hidden" id="appMainRoot">
+
+        <!-- Login / Register Overlay -->
+        <div id="authOverlay" class="absolute inset-0 z-50 bg-white flex flex-col justify-center p-6 overflow-y-auto">
+            <div class="max-w-md w-full mx-auto">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white text-2xl shadow-lg shadow-blue-200">
+                        <i class="fa-solid fa-car-wrench"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-900" id="authTitle" style="font-size: calc(1.5rem * var(--font-scale, 1));">카디자인</h1>
+                    <p class="text-slate-500 text-sm mt-1" id="authSubTitle" style="font-size: calc(0.875rem * var(--font-scale, 1));">고객 및 A/S 종합 관리 시스템</p>
+                </div>
+
+                <!-- Login Form -->
+                <div id="loginFormContainer" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">아이디</label>
+                        <input type="text" id="loginId" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="아이디를 입력하세요">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">비밀번호</label>
+                        <input type="password" id="loginPw" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="비밀번호를 입력하세요">
+                    </div>
+                    <div class="flex items-center pt-1">
+                        <label class="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer">
+                            <input type="checkbox" id="rememberMe" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span>아이디 및 비밀번호 기억하기</span>
+                        </label>
+                    </div>
+                    <button type="button" onclick="handleLogin()" class="w-full py-3.5 bg-blue-600 text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-200 btn-touch">
+                        로그인
+                    </button>
+                    <div class="flex items-center justify-between pt-2">
+                        <button type="button" onclick="switchAuthMode('register')" class="text-xs text-blue-600 font-medium hover:underline">
+                            대리점 회원가입 신청
+                        </button>
+                        <button type="button" onclick="openFindAccountModal()" class="text-xs text-slate-500 hover:underline">
+                            아이디 / 비밀번호 찾기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="registerFormContainer" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">사용할 아이디</label>
+                        <input type="text" id="regId" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="아이디 입력">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">비밀번호</label>
+                        <input type="password" id="regPw" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="비밀번호 입력">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">대리점명 (이름/상호명)</label>
+                        <input type="text" id="regName" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 강남점 / 홍길동">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">연락처</label>
+                        <input type="tel" id="regPhone" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="010-0000-0000">
+                    </div>
+                    <button type="button" onclick="handleRegister()" class="w-full py-3.5 bg-blue-600 text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-200 btn-touch">
+                        대리점 회원가입 신청하기
+                    </button>
+                    <div class="text-center pt-2">
+                        <button type="button" onclick="switchAuthMode('login')" class="text-xs text-slate-600 font-medium hover:underline">
+                            <i class="fa-solid fa-arrow-left mr-1"></i> 로그인 화면으로 돌아가기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+            <div class="flex items-center space-x-2">
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-200">
+                    <i class="fa-solid fa-car-wrench text-sm"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-slate-900 text-base leading-tight" style="font-size: calc(1rem * var(--font-scale, 1));">카디자인</h1>
+                    <p class="text-[11px] text-slate-500 leading-none mt-0.5" id="userRoleBadge" style="font-size: calc(0.6875rem * var(--font-scale, 1));">대리점 전산 관리</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <!-- Font Size Controls -->
+                <div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                    <button type="button" onclick="adjustFontSize(-0.1)" class="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-600 hover:bg-white rounded-md transition" title="글씨 줄이기">A-</button>
+                    <button type="button" onclick="adjustFontSize(0.1)" class="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-600 hover:bg-white rounded-md transition" title="글씨 키우기">A+</button>
+                </div>
+                <button type="button" onclick="openCustomerModal()" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1 shadow-sm btn-touch">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>신규등록</span>
+                </button>
+                <button type="button" onclick="handleLogout()" class="bg-slate-100 text-slate-600 px-2.5 py-2 rounded-xl text-xs font-medium hover:bg-slate-200 transition btn-touch" title="로그아웃">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sub Header & Filters -->
+        <div class="bg-white border-b border-slate-200 px-4 py-3 space-y-3 z-20">
+            <!-- Search Bar -->
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="renderApp()" placeholder="고객명, 연락처, 차종, 차량번호 검색" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Admin Controls / Month Filter & Excel Button Bar -->
+            <div class="flex items-center justify-between text-xs pt-1">
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-slate-700">매출조회:</span>
+                    <select id="monthFilter" onchange="renderApp()" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="all">전체 누적 매출</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm btn-touch flex items-center space-x-1">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>엑셀 다운로드</span>
+                    </button>
+                    <div id="adminApprovalBtnContainer" class="hidden">
+                        <button type="button" onclick="openApprovalModal()" class="bg-amber-500 text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm btn-touch">
+                            <i class="fa-solid fa-user-check mr-1"></i> 승인 관리 <span id="pendingCountBadge" class="bg-white text-amber-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold ml-0.5">0</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Filter Tabs -->
+            <div class="flex space-x-1.5 overflow-x-auto hide-scrollbar pt-1 pb-1" id="statusTabsContainer">
+                <button type="button" onclick="setStatusTab('전체')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white" data-status="전체">전체</button>
+                <button type="button" onclick="setStatusTab('설치예약')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="설치예약">설치예약</button>
+                <button type="button" onclick="setStatusTab('설치완료')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="설치완료">설치완료</button>
+                <button type="button" onclick="setStatusTab('설치취소')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="설치취소">설치취소</button>
+                <button type="button" onclick="setStatusTab('A/S접수')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="A/S접수">A/S접수</button>
+                <button type="button" onclick="setStatusTab('AS완료')" class="status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="AS완료">AS완료</button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-4 space-y-4 pb-24" id="mainContentArea">
+            <!-- Statistics Card Summary -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-md shadow-blue-100">
+                    <p class="text-[11px] text-blue-100 font-medium">선택 기간 총 매출</p>
+                    <h3 class="text-xl font-bold mt-1" id="totalRevenueText">0원</h3>
+                    <div class="mt-2 text-[10px] bg-blue-400/30 px-2 py-0.5 rounded inline-block" id="revenueDetailText">설치 + 유상 A/S</div>
+                </div>
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-500 font-medium">조회된 고객 건수</p>
+                        <h3 class="text-xl font-bold text-slate-800 mt-1" id="totalCountText">0건</h3>
+                    </div>
+                    <div class="text-[10px] text-slate-400" id="currentFilterLabel">전체 상태 기준</div>
+                </div>
+            </div>
+
+            <!-- Customer & AS Cards List -->
+            <div id="customerCardsList" class="space-y-3">
+                <!-- Dynamic Rendered Cards -->
+            </div>
+        </main>
+
+        <!-- Customer Registration / Edit Modal -->
+        <div id="customerModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900" id="modalTitle">신규 고객 및 설치 등록</h3>
+                    <button type="button" onclick="closeCustomerModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="customerForm" onsubmit="saveCustomer(event)" class="space-y-3 text-xs">
+                    <input type="hidden" id="editCustomerId">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">고객명 *</label>
+                            <input type="text" id="cName" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">전화번호 *</label>
+                            <input type="tel" id="cPhone" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="010-0000-0000">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">주소</label>
+                        <input type="text" id="cAddress" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="설치 지역 또는 상세 주소">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">차종</label>
+                            <input type="text" id="cCarModel" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: 그랜저 GN7">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">차량번호</label>
+                            <input type="text" id="cCarNumber" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: 123가 4567">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">설치 제품 / 모델명 *</label>
+                            <input type="text" id="cProduct" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: QXD8000">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">최초 설치일 (예약일)</label>
+                            <input type="date" id="cInstallDate" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">장착 금액 (원)</label>
+                            <input type="number" id="cPrice" value="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">진행 상태</label>
+                            <select id="cStatus" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="설치예약">설치예약</option>
+                                <option value="설치완료">설치완료</option>
+                                <option value="설치취소">설치취소</option>
+                                <option value="A/S접수">A/S접수</option>
+                                <option value="AS완료">AS완료</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">유입 경로</label>
+                            <input type="text" id="cChannel" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="예: 네이버 예약, 지인 소개">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">담당 대리점</label>
+                            <select id="cBranch" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">특이사항 메모</label>
+                        <textarea id="cMemo" rows="2" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="추가 요청사항 및 메모"></textarea>
+                    </div>
+                    <div class="flex space-x-2 pt-2">
+                        <button type="button" onclick="closeCustomerModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs hover:bg-slate-200 transition">취소</button>
+                        <button type="submit" class="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-lg shadow-blue-200 btn-touch">저장하기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- A/S Registration Modal -->
+        <div id="asModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-xs">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900">A/S 접수 및 유상 비용 등록</h3>
+                    <button type="button" onclick="closeAsModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="asForm" onsubmit="saveAsRegistration(event)" class="space-y-3">
+                    <input type="hidden" id="asCustomerId">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">대상 고객</label>
+                        <input type="text" id="asCustomerInfoDisplay" disabled class="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">A/S 증상 및 요청 내용 *</label>
+                        <textarea id="asContent" required rows="3" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="불량 증상 및 수리 요청 사항 입력"></textarea>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">A/S 유상 청구 비용 (원)</label>
+                        <input type="number" id="asCost" value="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="공임비 및 부품 비용">
+                    </div>
+                    <div class="flex space-x-2 pt-2">
+                        <button type="button" onclick="closeAsModal()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition">취소</button>
+                        <button type="submit" class="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-200 btn-touch">A/S 접수하기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- SMS / Kakao Messenger Modal -->
+        <div id="smsModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-xs">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900">고객 문자 및 카카오톡 전송</h3>
+                    <button type="button" onclick="closeSmsModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-slate-600">발송할 양식을 선택하세요.</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="setSmsTemplate('card')" class="p-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-semibold hover:bg-blue-100 text-center">
+                            📱 설치 완료 / 명함
+                        </button>
+                        <button type="button" onclick="setSmsTemplate('as')" class="p-3 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-semibold hover:bg-amber-100 text-center">
+                            🔧 A/S 접수 안내
+                        </button>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">문자 / 카톡 발송 내용 미리보기</label>
+                        <textarea id="smsTextPreview" rows="7" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs focus:outline-none"></textarea>
+                    </div>
+                    <div class="flex space-x-2 pt-2">
+                        <button type="button" onclick="copySmsText()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-copy mr-1"></i> 문구 복사
+                        </button>
+                        <button type="button" onclick="sendSmsDirect()" class="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-200 btn-touch">
+                            <i class="fa-solid fa-paper-plane mr-1"></i> 문자앱으로 보내기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Branch Approval Modal -->
+        <div id="approvalModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-4 shadow-2xl text-xs">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900">대리점 회원가입 승인 관리</h3>
+                    <button type="button" onclick="closeApprovalModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div id="pendingApprovalList" class="space-y-3">
+                    <!-- Dynamic -->
+                </div>
+                <div class="pt-2 text-right">
+                    <button type="button" onclick="closeApprovalModal()" class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-xl">닫기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Find Account Modal -->
+        <div id="findAccountModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-xs">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="text-base font-bold text-slate-900">아이디 / 비밀번호 찾기</h3>
+                    <button type="button" onclick="closeFindAccountModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">대리점명 (이름/상호명)</label>
+                        <input type="text" id="findName" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="가입 시 입력한 대리점명">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">연락처</label>
+                        <input type="tel" id="findPhone" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="010-0000-0000">
+                    </div>
+                    <button type="button" onclick="executeFindAccount()" class="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl shadow-md btn-touch">아이디 및 비밀번호 찾기</button>
+                    <div id="findAccountResult" class="p-3 bg-slate-50 rounded-xl text-slate-600 hidden space-y-1"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Script with Firebase Realtime Sync -->
+    <script>
+        // ==========================================
+        // 🔑 본인의 파이어베이스 설정값을 아래에 입력하세요!
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const firestore = firebase.firestore();
+
+        let db = {
+            users: [
+                { id: 'zkelwkdls', pw: 'whdalsdl@1', name: '최고관리자', phone: '010-0000-0000', role: 'admin', approved: true }
+            ],
+            customers: []
+        };
+
+        let currentUser = null;
+        let currentStatusTab = '전체';
+        let currentFontScale = 1.0;
+        let selectedCustomerForSms = null;
+        let isInitialLoad = true;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedScale = localStorage.getItem('cardesign_font_scale');
+            if (savedScale) currentFontScale = parseFloat(savedScale);
+            applyFontSize();
+            loadSavedCredentials();
+            
+            // 파이어베이스 실시간 리스너 연결 (데이터 변경 시 모든 사용자 화면 자동 갱신)
+            initFirebaseRealtimeSync();
+        });
+
+        function initFirebaseRealtimeSync() {
+            firestore.collection('cardesign').doc('store').onSnapshot((doc) => {
+                if (doc.exists) {
+                    const remoteData = doc.data();
+                    if (remoteData && remoteData.users) {
+                        db = remoteData;
+                    }
+                } else {
+                    // 최초 실행 시 기본 데이터 업로드
+                    syncToFirebase();
+                }
+
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    checkAuthSession();
+                } else {
+                    // 실시간 동기화 반영 중 화면 갱신
+                    if (currentUser) {
+                        populateBranchSelect();
+                        updatePendingBadge();
+                        populateMonthFilterOptions();
+                        renderApp();
+                    }
+                }
+            }, (error) => {
+                console.error("Firestore 동기화 오류:", error);
+                // 오프라인 대비 로컬스토리지 백업 로직
+                loadFromLocalStorage();
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    checkAuthSession();
+                }
+            });
+        }
+
+        function syncToFirebase() {
+            firestore.collection('cardesign').doc('store').set(db)
+                .catch((error) => {
+                    console.error("Firebase 저장 실패:", error);
+                });
+        }
+
+        function loadFromLocalStorage() {
+            const savedDb = localStorage.getItem('cardesign_db_firebase_backup');
+            if (savedDb) {
+                try { db = JSON.parse(savedDb); } catch (e) {}
+            }
+        }
+
+        function saveToLocalStorageAndCloud() {
+            localStorage.setItem('cardesign_db_firebase_backup', JSON.stringify(db));
+            localStorage.setItem('cardesign_font_scale', currentFontScale);
+            syncToFirebase(); // 클라우드에 실시간 반영
+        }
+
+        function loadSavedCredentials() {
+            const savedCreds = localStorage.getItem('cardesign_saved_creds');
+            if (savedCreds) {
+                try {
+                    const creds = JSON.parse(savedCreds);
+                    document.getElementById('loginId').value = creds.id || '';
+                    document.getElementById('loginPw').value = creds.pw || '';
+                    document.getElementById('rememberMe').checked = true;
+                    
+                    if (creds.id && creds.pw) {
+                        const user = db.users.find(u => u.id === creds.id && u.pw === creds.pw && u.approved);
+                        if (user) {
+                            currentUser = user;
+                            sessionStorage.setItem('cardesign_current_user', JSON.stringify(currentUser));
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+
+        function adjustFontSize(delta) {
+            currentFontScale = Math.min(1.3, Math.max(0.85, currentFontScale + delta));
+            saveToLocalStorageAndCloud();
+            applyFontSize();
+        }
+
+        function applyFontSize() {
+            document.documentElement.style.setProperty('--font-scale', currentFontScale);
+            document.body.style.fontSize = `${currentFontScale * 0.875}rem`;
+        }
+
+        function checkAuthSession() {
+            const savedUser = sessionStorage.getItem('cardesign_current_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                // 최신 db 상태에서 유저 권한 재확인
+                const freshUser = db.users.find(u => u.id === currentUser.id);
+                if (freshUser && freshUser.approved) {
+                    currentUser = freshUser;
+                    document.getElementById('authOverlay').classList.add('hidden');
+                    initAppUI();
+                } else {
+                    handleLogout();
+                }
+            } else {
+                document.getElementById('authOverlay').classList.remove('hidden');
+            }
+        }
+
+        function switchAuthMode(mode) {
+            const loginCont = document.getElementById('loginFormContainer');
+            const regCont = document.getElementById('registerFormContainer');
+            const titleEl = document.getElementById('authTitle');
+            const subTitleEl = document.getElementById('authSubTitle');
+
+            if (mode === 'register') {
+                loginCont.classList.add('hidden');
+                regCont.classList.remove('hidden');
+                titleEl.textContent = '대리점 회원가입';
+                subTitleEl.textContent = '관리자 승인 후 시스템을 이용하실 수 있습니다.';
+            } else {
+                loginCont.classList.remove('hidden');
+                regCont.classList.add('hidden');
+                titleEl.textContent = '카디자인';
+                subTitleEl.textContent = '고객 및 A/S 종합 관리 시스템';
+            }
+        }
+
+        function handleLogin() {
+            const id = document.getElementById('loginId').value.trim();
+            const pw = document.getElementById('loginPw').value.trim();
+            const rememberMe = document.getElementById('rememberMe').checked;
+
+            if (!id || !pw) {
+                alert('아이디와 비밀번호를 입력해주세요.');
+                return;
+            }
+
+            const user = db.users.find(u => u.id === id && u.pw === pw);
+            if (!user) {
+                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+                return;
+            }
+
+            if (!user.approved) {
+                alert('관리자의 가입 승인 대기 중입니다.');
+                return;
+            }
+
+            if (rememberMe) {
+                localStorage.setItem('cardesign_saved_creds', JSON.stringify({ id, pw }));
+            } else {
+                localStorage.removeItem('cardesign_saved_creds');
+            }
+
+            currentUser = user;
+            sessionStorage.setItem('cardesign_current_user', JSON.stringify(currentUser));
+            document.getElementById('authOverlay').classList.add('hidden');
+            initAppUI();
+        }
+
+        function handleRegister() {
+            const id = document.getElementById('regId').value.trim();
+            const pw = document.getElementById('regPw').value.trim();
+            const name = document.getElementById('regName').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+
+            if (!id || !pw || !name || !phone) {
+                alert('모든 항목을 입력해주세요.');
+                return;
+            }
+
+            if (db.users.some(u => u.id === id)) {
+                alert('이미 사용 중인 아이디입니다.');
+                return;
+            }
+
+            db.users.push({ id, pw, name, phone, role: 'branch', approved: false });
+            saveToLocalStorageAndCloud();
+            alert('회원가입 신청이 완료되었습니다.');
+            switchAuthMode('login');
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            sessionStorage.removeItem('cardesign_current_user');
+            document.getElementById('authOverlay').classList.remove('hidden');
+        }
+
+        function initAppUI() {
+            const roleBadge = document.getElementById('userRoleBadge');
+            const adminApprovalCont = document.getElementById('adminApprovalBtnContainer');
+
+            if (currentUser.role === 'admin') {
+                roleBadge.textContent = '최고관리자 (전체 권한)';
+                adminApprovalCont.classList.remove('hidden');
+            } else {
+                roleBadge.textContent = `대리점: ${currentUser.name}`;
+                adminApprovalCont.classList.add('hidden');
+            }
+
+            populateBranchSelect();
+            updatePendingBadge();
+            populateMonthFilterOptions();
+            renderApp();
+        }
+
+        function populateBranchSelect() {
+            const select = document.getElementById('cBranch');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '';
+            db.users.filter(u => u.approved).forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.name;
+                opt.textContent = u.name;
+                select.appendChild(opt);
+            });
+            if (currentVal) select.value = currentVal;
+        }
+
+        function updatePendingBadge() {
+            const badge = document.getElementById('pendingCountBadge');
+            if (badge) badge.textContent = db.users.filter(u => !u.approved).length;
+        }
+
+        function populateMonthFilterOptions() {
+            const monthSelect = document.getElementById('monthFilter');
+            if (!monthSelect) return;
+            const currentVal = monthSelect.value;
+            const monthsSet = new Set();
+            db.customers.forEach(c => c.installDate && monthsSet.add(c.installDate.substring(0, 7)));
+            monthSelect.innerHTML = '<option value="all">전체 누적 매출</option>';
+            Array.from(monthsSet).sort().reverse().forEach(ym => {
+                const [y, m] = ym.split('-');
+                const opt = document.createElement('option');
+                opt.value = ym;
+                opt.textContent = `${y}년 ${parseInt(m)}월`;
+                monthSelect.appendChild(opt);
+            });
+            monthSelect.value = currentVal;
+        }
+
+        function setStatusTab(status) {
+            currentStatusTab = status;
+            document.querySelectorAll('.status-tab').forEach(btn => {
+                btn.className = btn.getAttribute('data-status') === status
+                    ? 'status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white'
+                    : 'status-tab flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-slate-100 text-slate-600 hover:bg-slate-200';
+            });
+            renderApp();
+        }
+
+        function getFilteredCustomers() {
+            const searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+            const monthFilter = document.getElementById('monthFilter').value;
+
+            return db.customers.filter(c => {
+                if (currentUser && currentUser.role !== 'admin' && c.branch !== currentUser.name) return false;
+                if (currentStatusTab !== '전체' && c.status !== currentStatusTab) return false;
+                if (monthFilter !== 'all' && c.installDate && !c.installDate.startsWith(monthFilter)) return false;
+                if (searchQuery) {
+                    const match = [c.name, c.phone, c.carModel, c.carNumber, c.product].some(v => (v || '').toLowerCase().includes(searchQuery));
+                    if (!match) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderApp() {
+            const filtered = getFilteredCustomers();
+
+            let totalRev = 0;
+            filtered.forEach(c => {
+                totalRev += (parseInt(c.price) || 0);
+                (c.asHistory || []).forEach(as => totalRev += (parseInt(as.cost) || 0));
+            });
+
+            document.getElementById('totalRevenueText').textContent = totalRev.toLocaleString() + '원';
+            document.getElementById('totalCountText').textContent = filtered.length + '건';
+            document.getElementById('currentFilterLabel').textContent = currentStatusTab === '전체' ? '전체 상태 기준' : `${currentStatusTab} 기준`;
+
+            const listContainer = document.getElementById('customerCardsList');
+            listContainer.innerHTML = '';
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-12 bg-white rounded-2xl border border-slate-200">
+                        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-3">
+                            <i class="fa-solid fa-folder-open text-lg"></i>
+                        </div>
+                        <p class="text-slate-500 text-xs">조회된 내역이 없습니다.</p>
+                    </div>`;
+                return;
+            }
+
+            filtered.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3';
+                
+                let badgeColor = 'bg-slate-100 text-slate-700';
+                if (c.status === '설치완료') badgeColor = 'bg-emerald-100 text-emerald-700';
+                else if (c.status === '설치예약') badgeColor = 'bg-blue-100 text-blue-700';
+                else if (c.status === '설치취소') badgeColor = 'bg-rose-100 text-rose-700';
+                else if (c.status === 'A/S접수') badgeColor = 'bg-amber-100 text-amber-700';
+                else if (c.status === 'AS완료') badgeColor = 'bg-purple-100 text-purple-700';
+
+                let asHtml = '';
+                if (c.asHistory && c.asHistory.length > 0) {
+                    asHtml = `<div class="mt-2 pt-2 border-t border-slate-100 space-y-1"><p class="text-[11px] font-bold text-slate-700"><i class="fa-solid fa-wrench mr-1 text-amber-500"></i> A/S 내역 (${c.asHistory.length}건)</p>`;
+                    c.asHistory.forEach(as => {
+                        asHtml += `<div class="text-[11px] bg-slate-50 p-2 rounded-lg flex justify-between items-center"><div><span class="text-slate-400 mr-2">${as.date}</span><span class="text-slate-700">${as.content}</span></div><span class="font-semibold text-blue-600">+${(parseInt(as.cost)||0).toLocaleString()}원</span></div>`;
+                    });
+                    asHtml += `</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-slate-900 text-sm">${c.name}</span>
+                                <a href="tel:${c.phone}" class="text-xs text-blue-600 font-medium hover:underline"><i class="fa-solid fa-phone mr-0.5"></i>${c.phone}</a>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${badgeColor}">${c.status}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5">${c.carModel || '차종 미입력'} (${c.carNumber || '차량번호 없음'}) · ${c.address || '주소 미입력'}</p>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <button type="button" onclick="openCustomerModal('${c.id}')" class="w-7 h-7 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200 flex items-center justify-center text-xs"><i class="fa-solid fa-pen"></i></button>
+                            <button type="button" onclick="deleteCustomer('${c.id}')" class="w-7 h-7 bg-rose-50 rounded-lg text-rose-600 hover:bg-rose-100 flex items-center justify-center text-xs"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-2.5 grid grid-cols-2 gap-2 text-[11px]">
+                        <div><span class="text-slate-400">설치 제품:</span> <span class="font-semibold text-slate-700">${c.product}</span></div>
+                        <div><span class="text-slate-400">장착 금액:</span> <span class="font-semibold text-slate-700">${(parseInt(c.price)||0).toLocaleString()}원</span></div>
+                        <div><span class="text-slate-400">설치일(예약):</span> <span class="text-slate-700">${c.installDate || '-'}</span></div>
+                        <div><span class="text-slate-400">담당 대리점:</span> <span class="text-slate-700">${c.branch || '-'}</span></div>
+                    </div>
+                    ${c.memo ? `<p class="text-[11px] text-slate-600 bg-amber-50/60 p-2 rounded-lg border border-amber-100/50"><span class="font-semibold text-amber-800">메모:</span> ${c.memo}</p>` : ''}
+                    ${asHtml}
+                    <div class="flex justify-end space-x-2 pt-1">
+                        <button type="button" onclick="openSmsModal('${c.id}')" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-semibold hover:bg-blue-100 transition btn-touch">
+                            <i class="fa-solid fa-comment-dots mr-1"></i> 문자 전송
+                        </button>
+                        <button type="button" onclick="openAsModal('${c.id}')" class="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-semibold hover:bg-amber-100 transition btn-touch">
+                            <i class="fa-solid fa-screwdriver-wrench mr-1"></i> A/S 접수 / 비용등록
+                        </button>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        // 엑셀 다운로드 (CSV 추출)
+        function exportToExcel() {
+            const filtered = getFilteredCustomers();
+            if (filtered.length === 0) {
+                alert('다운로드할 고객 데이터가 없습니다.');
+                return;
+            }
+
+            let csvContent = "\uFEFF"; // UTF-8 BOM
+            csvContent += "고객명,연락처,주소,차종,차량번호,설치제품,설치일,장착금액,진행상태,담당대리점,유입경로,메모,총청구금액(A/S포함)\n";
+
+            filtered.forEach(c => {
+                let totalAsCost = 0;
+                (c.asHistory || []).forEach(as => totalAsCost += (parseInt(as.cost) || 0));
+                const grandTotal = (parseInt(c.price) || 0) + totalAsCost;
+
+                const row = [
+                    `"${c.name || ''}"`,
+                    `"${c.phone || ''}"`,
+                    `"${(c.address || '').replace(/"/g, '""')}"`,
+                    `"${c.carModel || ''}"`,
+                    `"${c.carNumber || ''}"`,
+                    `"${c.product || ''}"`,
+                    `"${c.installDate || ''}"`,
+                    c.price || 0,
+                    `"${c.status || ''}"`,
+                    `"${c.branch || ''}"`,
+                    `"${c.channel || ''}"`,
+                    `"${(c.memo || '').replace(/"/g, '""')}"`,
+                    grandTotal
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            const today = new Date().toISOString().substring(0, 10);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `카디자인_고객_및_매출대장_${today}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 문자 및 카카오톡 공유 모달
+        function openSmsModal(customerId) {
+            const c = db.customers.find(item => item.id === customerId);
+            if (!c) return;
+            selectedCustomerForSms = c;
+            setSmsTemplate('card');
+            document.getElementById('smsModal').classList.remove('hidden');
+        }
+
+        function closeSmsModal() {
+            document.getElementById('smsModal').classList.add('hidden');
+        }
+
+        function setSmsTemplate(type) {
+            if (!selectedCustomerForSms) return;
+            const c = selectedCustomerForSms;
+            const branchName = c.branch || (currentUser ? currentUser.name : '카디자인');
+            let text = '';
+
+            if (type === 'card') {
+                text = `[카디자인 ${branchName}]\n안녕하세요, ${c.name} 고객님!\n요청하신 작업이 성공적으로 완료되었습니다.\n\n■ 차량: ${c.carModel || '-'} (${c.carNumber || '-'})\n■ 장착 제품: ${c.product || '-'}\n■ 담당 대리점: ${branchName}\n\n이용해 주셔서 감사합니다. 점검 및문의사항은 언제든 연락 바랍니다!`;
+            } else if (type === 'as') {
+                text = `[카디자인 A/S 안내]\n안녕하세요, ${c.name} 고객님!\nA/S 접수가 정상적으로 완료되었습니다.\n\n■ 차종/차량번호: ${c.carModel || ''} (${c.carNumber || ''})\n■ 담당 대리점: ${branchName}\n\n빠르고 정확하게 점검해 드리겠습니다. 감사합니다.`;
+            }
+            document.getElementById('smsTextPreview').value = text;
+        }
+
+        function copySmsText() {
+            const text = document.getElementById('smsTextPreview').value;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('문구가 클립보드에 복사되었습니다.\n카카오톡이나 문자 창에 붙여넣기(Ctrl+V)하세요.');
+            }).catch(() => {
+                alert('복사 중 오류가 발생했습니다.');
+            });
+        }
+
+        function sendSmsDirect() {
+            if (!selectedCustomerForSms) return;
+            const phone = selectedCustomerForSms.phone.replace(/[^0-9]/g, '');
+            const text = encodeURIComponent(document.getElementById('smsTextPreview').value);
+            window.location.href = `sms:${phone}?body=${text}`;
+        }
+
+        function openCustomerModal(id = null) {
+            document.getElementById('customerForm').reset();
+            document.getElementById('editCustomerId').value = '';
+            document.getElementById('cInstallDate').value = new Date().toISOString().substring(0, 10);
+            populateBranchSelect();
+            if (currentUser && currentUser.role !== 'admin') document.getElementById('cBranch').value = currentUser.name;
+
+            if (id) {
+                document.getElementById('modalTitle').textContent = '고객 및 설치 정보 수정';
+                const c = db.customers.find(item => item.id === id);
+                if (c) {
+                    document.getElementById('editCustomerId').value = c.id;
+                    document.getElementById('cName').value = c.name || '';
+                    document.getElementById('cPhone').value = c.phone || '';
+                    document.getElementById('cAddress').value = c.address || '';
+                    document.getElementById('cCarModel').value = c.carModel || '';
+                    document.getElementById('cCarNumber').value = c.carNumber || '';
+                    document.getElementById('cProduct').value = c.product || '';
+                    document.getElementById('cInstallDate').value = c.installDate || '';
+                    document.getElementById('cPrice').value = c.price || 0;
+                    document.getElementById('cStatus').value = c.status || '설치완료';
+                    document.getElementById('cChannel').value = c.channel || '';
+                    document.getElementById('cBranch').value = c.branch || (currentUser ? currentUser.name : '');
+                    document.getElementById('cMemo').value = c.memo || '';
+                }
+            } else {
+                document.getElementById('modalTitle').textContent = '신규 고객 및 설치 등록';
+            }
+            document.getElementById('customerModal').classList.remove('hidden');
+        }
+
+        function closeCustomerModal() { document.getElementById('customerModal').classList.add('hidden'); }
+
+        function saveCustomer(event) {
+            event.preventDefault();
+            const editId = document.getElementById('editCustomerId').value;
+            const data = {
+                name: document.getElementById('cName').value.trim(),
+                phone: document.getElementById('cPhone').value.trim(),
+                address: document.getElementById('cAddress').value.trim(),
+                carModel: document.getElementById('cCarModel').value.trim(),
+                carNumber: document.getElementById('cCarNumber').value.trim(),
+                product: document.getElementById('cProduct').value.trim(),
+                installDate: document.getElementById('cInstallDate').value,
+                price: parseInt(document.getElementById('cPrice').value) || 0,
+                status: document.getElementById('cStatus').value,
+                channel: document.getElementById('cChannel').value.trim(),
+                branch: document.getElementById('cBranch').value,
+                memo: document.getElementById('cMemo').value.trim()
+            };
+
+            if (editId) {
+                const c = db.customers.find(item => item.id === editId);
+                if (c) Object.assign(c, data);
+            } else {
+                db.customers.unshift({ id: 'c_' + Date.now(), ...data, asHistory: [] });
+            }
+
+            saveToLocalStorageAndCloud();
+            closeCustomerModal();
+            populateMonthFilterOptions();
+            renderApp();
+            alert('저장되었습니다.');
+        }
+
+        function deleteCustomer(id) {
+            if (confirm('삭제하시겠습니까?')) {
+                db.customers = db.customers.filter(c => c.id !== id);
+                saveToLocalStorageAndCloud();
+                populateMonthFilterOptions();
+                renderApp();
+            }
+        }
+
+        function openAsModal(customerId) {
+            const c = db.customers.find(item => item.id === customerId);
+            if (!c) return;
+            document.getElementById('asCustomerId').value = c.id;
+            document.getElementById('asCustomerInfoDisplay').value = `${c.name} (${c.phone})`;
+            document.getElementById('asContent').value = '';
+            document.getElementById('asCost').value = '0';
+            document.getElementById('asModal').classList.remove('hidden');
+        }
+
+        function closeAsModal() { document.getElementById('asModal').classList.add('hidden'); }
+
+        function saveAsRegistration(event) {
+            event.preventDefault();
+            const id = document.getElementById('asCustomerId').value;
+            const content = document.getElementById('asContent').value.trim();
+            const cost = parseInt(document.getElementById('asCost').value) || 0;
+
+            const c = db.customers.find(item => item.id === id);
+            if (c) {
+                if (!c.asHistory) c.asHistory = [];
+                c.asHistory.push({ date: new Date().toISOString().substring(0, 10), content, cost });
+                c.status = 'A/S접수';
+            }
+
+            saveToLocalStorageAndCloud();
+            closeAsModal();
+            renderApp();
+            alert('A/S 접수가 완료되었습니다.');
+        }
+
+        function openApprovalModal() {
+            const container = document.getElementById('pendingApprovalList');
+            container.innerHTML = '';
+            const pending = db.users.filter(u => !u.approved);
+
+            if (pending.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-center py-6">승인 대기 중인 대리점이 없습니다.</p>';
+            } else {
+                pending.forEach(u => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between';
+                    div.innerHTML = `
+                        <div>
+                            <p class="font-bold text-slate-900">${u.name} <span class="text-xs text-slate-400">(${u.id})</span></p>
+                            <p class="text-[11px] text-slate-500">${u.phone}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="approveUser('${u.id}')" class="px-3 py-1.5 bg-emerald-600 text-white font-semibold rounded-lg text-xs">승인</button>
+                            <button type="button" onclick="rejectUser('${u.id}')" class="px-3 py-1.5 bg-rose-600 text-white font-semibold rounded-lg text-xs">거절</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            document.getElementById('approvalModal').classList.remove('hidden');
+        }
+
+        function closeApprovalModal() { document.getElementById('approvalModal').classList.add('hidden'); }
+
+        function approveUser(id) {
+            const u = db.users.find(item => item.id === id);
+            if (u) {
+                u.approved = true;
+                saveToLocalStorageAndCloud();
+                updatePendingBadge();
+                populateBranchSelect();
+                openApprovalModal();
+            }
+        }
+
+        function rejectUser(id) {
+            db.users = db.users.filter(item => item.id !== id);
+            saveToLocalStorageAndCloud();
+            updatePendingBadge();
+            openApprovalModal();
+        }
+
+        function openFindAccountModal() { document.getElementById('findAccountModal').classList.remove('hidden'); }
+        function closeFindAccountModal() { document.getElementById('findAccountModal').classList.add('hidden'); }
+        function executeFindAccount() {
+            const name = document.getElementById('findName').value.trim();
+            const phone = document.getElementById('findPhone').value.trim();
+            const resDiv = document.getElementById('findAccountResult');
+
+            const found = db.users.find(u => u.name === name && u.phone === phone);
+            resDiv.classList.remove('hidden');
+            if (found) {
+                resDiv.innerHTML = `<p class="font-semibold text-slate-800">조회 결과:</p><p>아이디: <strong class="text-blue-600">${found.id}</strong></p><p>비밀번호: <strong class="text-blue-600">${found.pw}</strong></p>`;
+            } else {
+                resDiv.innerHTML = `<p class="text-rose-600">회원 정보를 찾을 수 없습니다.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
